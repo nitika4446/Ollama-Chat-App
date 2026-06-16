@@ -1,123 +1,92 @@
-# app.py
-# ChatGPT-like Application using Ollama + Python + Streamlit
-
 import streamlit as st
-import requests
-import json
+import google.generativeai as genai
 
 # ---------------- PAGE CONFIG ----------------
+
 st.set_page_config(
-    page_title="Ollama Chat App",
-    page_icon="🤖",
-    layout="wide"
+page_title="AI Chat Application",
+page_icon="🤖",
+layout="wide"
 )
 
-# ---------------- CUSTOM CSS ----------------
-st.markdown("""
-<style>
-.main {
-    background-color: #0f172a;
-    color: white;
-}
-.stChatMessage {
-    border-radius: 12px;
-    padding: 10px;
-}
-</style>
-""", unsafe_allow_html=True)
+# ---------------- API KEY ----------------
+
+try:
+genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+except Exception:
+st.error(
+"GEMINI_API_KEY not found. Add it in Streamlit Secrets."
+)
+st.stop()
+
+# ---------------- MODEL ----------------
+
+model = genai.GenerativeModel("gemini-1.5-flash")
 
 # ---------------- TITLE ----------------
-st.title("🤖 AI Chat Application using Ollama")
-st.write("Built with Python + Streamlit + Ollama")
 
-# ---------------- SIDEBAR ----------------
-st.sidebar.header("⚙ Settings")
-
-model_name = st.sidebar.selectbox(
-    "Choose Ollama Model",
-    ["llama3", "mistral", "gemma", "phi3"]
-)
-
-temperature = st.sidebar.slider(
-    "Temperature",
-    0.0,
-    1.0,
-    0.7
-)
-
-max_tokens = st.sidebar.slider(
-    "Max Tokens",
-    50,
-    1000,
-    300
-)
+st.title("🤖 AI Chat Application")
+st.write("Built with Python + Streamlit + Gemini")
 
 # ---------------- SESSION STATE ----------------
-if "messages" not in st.session_state:
-    st.session_state.messages = []
 
-# ---------------- DISPLAY CHAT ----------------
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
+if "messages" not in st.session_state:
+st.session_state.messages = []
+
+# ---------------- DISPLAY HISTORY ----------------
+
+for msg in st.session_state.messages:
+with st.chat_message(msg["role"]):
+st.markdown(msg["content"])
 
 # ---------------- USER INPUT ----------------
+
 prompt = st.chat_input("Type your message here...")
 
-# ---------------- OLLAMA FUNCTION ----------------
-def get_ollama_response(prompt, model):
-    url = "http://localhost:11434/api/generate"
-
-    payload = {
-        "model": model,
-        "prompt": prompt,
-        "stream": False,
-        "options": {
-            "temperature": temperature,
-            "num_predict": max_tokens
-        }
-    }
-
-    response = requests.post(url, json=payload)
-
-    if response.status_code == 200:
-        data = response.json()
-        return data["response"]
-    else:
-        return f"Error: {response.status_code}"
-
-# ---------------- CHAT FLOW ----------------
 if prompt:
 
-    # Save user message
-    st.session_state.messages.append({
+```
+st.session_state.messages.append(
+    {
         "role": "user",
         "content": prompt
-    })
+    }
+)
 
-    # Display user message
-    with st.chat_message("user"):
-        st.markdown(prompt)
+with st.chat_message("user"):
+    st.markdown(prompt)
 
-    # Generate AI response
-    with st.chat_message("assistant"):
+with st.chat_message("assistant"):
 
-        with st.spinner("Thinking..."):
+    with st.spinner("Thinking..."):
 
-            response = get_ollama_response(prompt, model_name)
+        try:
+            response = model.generate_content(prompt)
 
-            st.markdown(response)
+            answer = response.text
 
-    # Save assistant message
-    st.session_state.messages.append({
-        "role": "assistant",
-        "content": response
-    })
+            st.markdown(answer)
+
+            st.session_state.messages.append(
+                {
+                    "role": "assistant",
+                    "content": answer
+                }
+            )
+
+        except Exception as e:
+            st.error(f"Error: {e}")
+```
 
 # ---------------- CLEAR CHAT ----------------
+
 if st.sidebar.button("🗑 Clear Chat"):
-    st.session_state.messages = []
-    st.rerun()
+st.session_state.messages = []
+st.rerun()
+
+
+
+
 
 
 
