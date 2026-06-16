@@ -1,88 +1,122 @@
 import streamlit as st
-import google.generativeai as genai
+import requests
+import json
 
-# ---------------- PAGE CONFIG ----------------
+---------------- PAGE CONFIG ----------------
 
 st.set_page_config(
-page_title="AI Chat Application",
+page_title="Ollama Chat App",
 page_icon="🤖",
 layout="wide"
 )
 
-# ---------------- API KEY ----------------
+---------------- CUSTOM CSS ----------------
 
-try:
-genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-except Exception:
-st.error(
-"GEMINI_API_KEY not found. Add it in Streamlit Secrets."
+st.markdown("""
+
+""", unsafe_allow_html=True)
+
+---------------- TITLE ----------------
+
+st.title("🤖 AI Chat Application using Ollama")
+st.write("Built with Python + Streamlit + Ollama")
+
+---------------- SIDEBAR ----------------
+
+st.sidebar.header("⚙ Settings")
+
+model_name = st.sidebar.selectbox(
+"Choose Ollama Model",
+["llama3", "mistral", "gemma", "phi3"]
 )
-st.stop()
 
-# ---------------- MODEL ----------------
+temperature = st.sidebar.slider(
+"Temperature",
+0.0,
+1.0,
+0.7
+)
 
-model = genai.GenerativeModel("gemini-1.5-flash")
+max_tokens = st.sidebar.slider(
+"Max Tokens",
+50,
+1000,
+300
+)
 
-# ---------------- TITLE ----------------
-
-st.title("🤖 AI Chat Application")
-st.write("Built with Python + Streamlit + Gemini")
-
-# ---------------- SESSION STATE ----------------
+---------------- SESSION STATE ----------------
 
 if "messages" not in st.session_state:
 st.session_state.messages = []
 
-# ---------------- DISPLAY HISTORY ----------------
+---------------- DISPLAY CHAT ----------------
 
-for msg in st.session_state.messages:
-with st.chat_message(msg["role"]):
-st.markdown(msg["content"])
+for message in st.session_state.messages:
+with st.chat_message(message["role"]):
+st.markdown(message["content"])
 
-# ---------------- USER INPUT ----------------
+---------------- USER INPUT ----------------
 
 prompt = st.chat_input("Type your message here...")
 
+---------------- OLLAMA FUNCTION ----------------
+
+def get_ollama_response(prompt, model):
+url = "http://localhost:11434/api/generate"
+
+payload = {
+    "model": model,
+    "prompt": prompt,
+    "stream": False,
+    "options": {
+        "temperature": temperature,
+        "num_predict": max_tokens
+    }
+}
+
+response = requests.post(url, json=payload)
+
+if response.status_code == 200:
+    data = response.json()
+    return data["response"]
+else:
+    return f"Error: {response.status_code}"
+
+---------------- CHAT FLOW ----------------
+
 if prompt:
 
-```
-st.session_state.messages.append(
-    {
-        "role": "user",
-        "content": prompt
-    }
-)
+# Save user message
+st.session_state.messages.append({
+    "role": "user",
+    "content": prompt
+})
 
+# Display user message
 with st.chat_message("user"):
     st.markdown(prompt)
 
+# Generate AI response
 with st.chat_message("assistant"):
 
     with st.spinner("Thinking..."):
 
-        try:
-            response = model.generate_content(prompt)
+        response = get_ollama_response(prompt, model_name)
 
-            answer = response.text
+        st.markdown(response)
 
-            st.markdown(answer)
+# Save assistant message
+st.session_state.messages.append({
+    "role": "assistant",
+    "content": response
+})
 
-            st.session_state.messages.append(
-                {
-                    "role": "assistant",
-                    "content": answer
-                }
-            )
-
-        except Exception as e:
-            st.error(f"Error: {e}")
-```
-
-# ---------------- CLEAR CHAT ----------------
+---------------- CLEAR CHAT ----------------
 
 if st.sidebar.button("🗑 Clear Chat"):
 st.session_state.messages = []
 st.rerun()
+
 
 
 
